@@ -1,15 +1,25 @@
+import { ConflictException } from '@nestjs/common';
 import { EntityRepository, Repository } from 'typeorm';
-import { CreateUserDto } from './create-user.dto';
+import * as bcrypt from 'bcrypt';
+import { AuthCredentialsDto } from './dto/auth-credentials.dto';
 import { User } from './user.entity';
 
 @EntityRepository(User)
 export class UsersRepository extends Repository<User> {
-  async createUser(createUserDto: CreateUserDto): Promise<void> {
-    const { username, password } = createUserDto;
+  async createUser(authCredentialsDto: AuthCredentialsDto): Promise<void> {
+    const { username, password } = authCredentialsDto;
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(password, salt);
     const user = this.create({
       username,
-      password,
+      password: hashedPassword,
     });
-    await this.save(user);
+    try {
+      await this.save(user);
+    } catch (e) {
+      if (e.code == 23505) {
+        throw new ConflictException('username already taken!');
+      }
+    }
   }
 }
